@@ -76,30 +76,24 @@ function standardize_data($dataset) {
 
 function calculate_similarity($user_input, $data) {
     $similarity = 0;
-    $total_weight = 0;
-
     for ($i = 0; $i < 36; $i++) {
-        $weight = $user_input[$i] / 100; // Using the percentage rating scale as weight
-
-        if ($weight > 0) { // Only consider features with a non-zero weight
-            $similarity += $weight * (5 - abs($data[$i] - $user_input[$i])) / 5;
-            $total_weight += $weight;
-        }
+        $similarity += (100 - abs($data[$i] - $user_input[$i])) / 100; // Use percentage similarity
     }
-
-    if ($total_weight == 0) {
-        return 0;
-    }
-
-    return ($similarity / $total_weight) * 100; // Return similarity as a percentage
+    return ($similarity / 36) * 100; // Return similarity as a percentage
 }
 
 function knn_recommendation($dataset, $user_input, $k = 3) {
     $similarities = [];
 
-    foreach ($dataset as $data) {
-        $similarity = calculate_similarity($user_input, $data);
-        $similarities[] = [$similarity, $data[36]]; // Store similarity and job label
+    // Divide the dataset into smaller chunks
+    $chunk_size = ceil(count($dataset) / 4); // Dividing it into 4 chunks
+    $chunks = array_chunk($dataset, $chunk_size);
+
+    foreach ($chunks as $chunk) {
+        foreach ($chunk as $data) {
+            $similarity = calculate_similarity($user_input, $data);
+            $similarities[] = [$similarity, $data[36]]; // Store similarity and job label
+        }
     }
 
     // Sort by similarity percentage (descending)
