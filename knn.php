@@ -1,24 +1,32 @@
 <?php
-function load_dataset($filename) {
-    $file = fopen($filename, "r");
+function load_dataset() {
+    $filename = 'C:\Users\Hendrix\VSCODENEW\CourseReco\data.csv'; // Adjust this path as necessary
+
+    // Check if the file exists
+    if (!file_exists($filename)) {
+        die("Error: The file does not exist at the specified path: $filename\n");
+    }
+
+    $fileContents = file_get_contents($filename);
     $dataset = [];
-    
-    // Read each line from the CSV file and convert it to an array
-    while (($data = fgetcsv($file, 1000, ",")) !== FALSE) {
+
+    $lines = explode("\n", $fileContents);
+
+    foreach ($lines as $line) {
+        $data = str_getcsv($line, ",");
+
         if (count($data) == 37) { // 36 questions + 1 course label
             $data_row = [];
             for ($i = 0; $i < 36; $i++) {
-                $data_row[] = (int)$data[$i]; // Convert question responses to integers
+                $data_row[] = (int)$data[$i]; // Convert responses to integers
             }
             $data_row[] = $data[36]; // Add the course label (last column)
             $dataset[] = $data_row;
         }
     }
-    fclose($file);
 
     return $dataset; // Return entire dataset
 }
-
 
 function standardize_data($dataset) {
     $means = [];
@@ -33,17 +41,22 @@ function standardize_data($dataset) {
         $std_devs[$i] = sqrt($variance);
     }
 
-    // Standardize dataset
+    // Standardize dataset with rating scale adjustments
     foreach ($dataset as &$row) {
         for ($i = 0; $i < 36; $i++) {
             if ($std_devs[$i] != 0) {
-                $rating_scale = $row[$i];
-                if ($rating_scale == 1) {
-                    $row[$i] = ($row[$i] - $means[$i]) / $std_devs[$i] * 0.1;
-                } elseif ($rating_scale == 2) {
-                    $row[$i] = ($row[$i] - $means[$i]) / $std_devs[$i] * 0.3;
-                } elseif ($rating_scale == 3) {
-                    $row[$i] = ($row[$i] - $means[$i]) / $std_devs[$i] * 0.6;
+                // Standardization
+                $standardized_value = ($row[$i] - $means[$i]) / $std_devs[$i];
+                
+                // Apply rating scale adjustments
+                if ($row[$i] == 1) {
+                    $row[$i] = $standardized_value * 0.1; // Scale for rating 1
+                } elseif ($row[$i] == 2) {
+                    $row[$i] = $standardized_value * 0.3; // Scale for rating 2
+                } elseif ($row[$i] == 3) {
+                    $row[$i] = $standardized_value * 0.6; // Scale for rating 3
+                } else {
+                    $row[$i] = $standardized_value; // No additional scaling for other ratings
                 }
             }
         }
@@ -61,9 +74,16 @@ function calculate_similarity($user_input, $data) {
 
 function knn_recommendation($dataset, $user_input, $k = 3) {
     $similarities = [];
-    foreach ($dataset as $data) {
-        $similarity = calculate_similarity($user_input, $data);
-        $similarities[] = [$similarity, $data[36]]; // Store similarity and course label
+
+    // Divide the dataset into smaller chunks
+    $chunk_size = ceil(count($dataset) / 4); // For example, divide into 4 chunks
+    $chunks = array_chunk($dataset, $chunk_size);
+
+    foreach ($chunks as $chunk) {
+        foreach ($chunk as $data) {
+            $similarity = calculate_similarity($user_input, $data);
+            $similarities[] = [$similarity, $data[36]]; // Store similarity and course label
+        }
     }
 
     // Sort by similarity percentage (descending)
@@ -84,6 +104,10 @@ function knn_recommendation($dataset, $user_input, $k = 3) {
             break;
         }
     }
+
+    return $top_courses;
+}
+?>
     
     return $top_courses;
 }
